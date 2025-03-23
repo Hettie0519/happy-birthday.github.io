@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Happy Birthday !</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22      viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎂</text></svg>"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: 'Helvetica Neue', 'Luxi Sans', 'DejaVu Sans', Tahoma, 'Hiragino Sans GB', 'Microsoft Yahei',
+          sans-serif;
+        background: #000;
+      }
+      .background-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: -1;
+      }
+      .foreground-canvas {
+        display: block;
+        margin: 0 auto; /* 确保在容器中居中 */
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="backgroundCanvas" class="background-canvas"></canvas>
+    <canvas id="foregroundCanvas" class="foreground-canvas"></canvas>
+
+    <script>
+      // 背景动画代码（hb1.html的部分）
+      const backgroundCanvas = document.getElementById('backgroundCanvas');
+      const backgroundCtx = backgroundCanvas.getContext('2d');
+
+      backgroundCanvas.height = window.innerHeight;
+      backgroundCanvas.width = window.innerWidth;
+
+      const texts = 'HAPPYBIRTHDAY'.split('');
+      const fontSize = 16;
+      const columns = backgroundCanvas.width / fontSize;
+      const drops = Array.from({ length: columns }, () => ({
+        index: Math.floor(Math.random() * texts.length),
+        position: Math.floor((Math.random() * backgroundCanvas.height) / fontSize),
+      }));
+
+      function drawBackground() {
+        backgroundCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        backgroundCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+
+        backgroundCtx.fillStyle = '#66f9cf';
+        backgroundCtx.font = `${fontSize}px arial`;
+
+        for (let i = 0; i < drops.length; i++) {
+          const text = texts[drops[i].index];
+          backgroundCtx.fillText(text, i * fontSize, drops[i].position * fontSize);
+
+          drops[i].position++;
+          drops[i].index = (drops[i].index + 1) % texts.length;
+
+          if (drops[i].position * fontSize > backgroundCanvas.height) {
+            drops[i].position = 0;
+            drops[i].index = Math.floor(Math.random() * texts.length);
+          }
+        }
+      }
+
+      setInterval(drawBackground, 35);
+
+      // 前景动画代码（hb2.html的部分）
+      var S = {
+        init: function () {
+          S.Drawing.init('#foregroundCanvas');
+
+          // 想说的话
+          S.UI.simulate('❤|');
+          S.Drawing.loop(function () {
+            S.Shape.render();
+          });
+        },
+      };
+      S.Drawing = (function () {
+        var canvas,
+          context,
+          renderFn,
+          requestFrame =
+            window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function (callback) {
+              window.setTimeout(callback, 1000 / 60);
+            };
+        return {
+          init: function (el) {
+            canvas = document.querySelector(el);
+            context = canvas.getContext('2d');
+            this.adjustCanvas();
+            window.addEventListener('resize', function (e) {
+              S.Drawing.adjustCanvas();
+            });
+          },
+          loop: function (fn) {
+            renderFn = !renderFn ? fn : renderFn;
+            this.clearFrame();
+            renderFn();
+            requestFrame.call(window, this.loop.bind(this));
+          },
+          adjustCanvas: function () {
+            canvas.width = window.innerWidth - 100;
+            canvas.height = window.innerHeight - 30;
+          },
+          clearFrame: function () {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+          },
+          getArea: function () {
+            return { w: canvas.width, h: canvas.height };
+          },
+          drawCircle: function (p, c) {
+            context.fillStyle = c.render();
+            context.beginPath();
+            context.arc(p.x, p.y, p.z, 0, 2 * Math.PI, true);
+            context.closePath();
+            context.fill();
+          },
+        };
+      })();
+      S.UI = (function () {
+        var interval,
+          currentAction,
+          time,
+          maxShapeSize = 30,
+          sequence = [],
+          cmd = '#';
+        function formatTime(date) {
+          var h = date.getHours(),
+            m = date.getMinutes(),
+            m = m < 10 ? '0' + m : m;
+          return h + ':' + m;
+        }
+        function getValue(value) {
+          return value && value.split(' ')[1];
+        }
+        function getAction(value) {
+          value = value && value.split(' ')[0];
+          return value && value[0] === cmd && value.substring(1);
+        }
+        function timedAction(fn, delay, max, reverse) {
+          clearInterval(interval);
+          currentAction = reverse ? max : 1;
+          fn(currentAction);
+          if (!max || (!reverse && currentAction < max) || (reverse && currentAction > 0)) {
+            interval = setInterval(function () {
+              currentAction = reverse ? currentAction - 1 : currentAction + 1;
+              fn(currentAction);
+              if ((!reverse && max && currentAction === max) || (reverse && currentAction === 0)) {
+                clearInterval(interval);
+              }
+            }, delay);
+          }
+        }
+        function performAction(value) {
+          var action, value, current;
+          sequence = typeof value === 'object' ? value : sequence.concat(value.split('|'));
+          timedAction(
+            function (index) {
+              current = sequence.shift();
+              action = getAction(current);
+              value = getValue(current);
+              switch (action) {
+                case 'countdown':
+                  value = parseInt(value) || 10;
+                  value = value > 0 ? value : 10;
+                  timedAction(
+                    function (index) {
+                      if (index === 0) {
+                        if (sequence.length === 0) {
+                          S.Shape.switchShape(S.ShapeBuilder.letter(''));
+                        } else {
+                          performAction(sequence);
+                        }
+                      } else {
+                        S.Shape.switchShape(S.ShapeBuilder.letter(index), true);
+                      }
+                    },
+                    1000,
+                    value,
+                    true,
+                  );
+                  break;
+                default:
+                  S.Shape.switchShape(S.ShapeBuilder.letter(current[0] === cmd ? 'HacPai' : current));
+              }
+            },
+            2000,
+            sequence.length,
+          );
+        }
+        return {
+          simulate: function (action) {
+            performAction(action);
+          },
+        };
+      })();
+      S.Point = function (args) {
+        this.x = args.x;
+        this.y = args.y;
+        this.z = args.z;
+        this.a = args.a;
+        this.h = args.h;
+      };
+      S.Color = function (r, g, b, a) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+        this.a = a;
+      };
+      S.Color.prototype = {
+        render: function () {
+          return 'rgba(' + this.r + ',' + +this.g + ',' + this.b + ',' + this.a + ')';
+        },
+      };
+      S.Dot = function (x, y) {
+        this.p = new S.Point({
+          x: x,
+          y: y,
+          z: 5,
+          a: 1,
+          h: 0,
+        });
+        this.e = 0.07;
+        this.s = true;
+        this.c = new S.Color(255, 255, 255, this.p.a);
+        this.t = this.clone();
+        this.q = [];
+      };
+      S.Dot.prototype = {
+        clone: function () {
+          return new S.Point({
+            x: this.x,
+            y: this.y,
+            z: this.z,
+            a: this.a,
+            h: this.h,
+          });
+        },
+        _draw: function () {
+          this.c.a = this.p.a;
+          S.Drawing.drawCircle(this.p, this.c);
+        },
+        _moveTowards: function (n) {
+          var details = this.distanceTo(n, true),
+            dx = details[0],
+            dy = details[1],
+            d = details[2],
+            e = this.e * d;
+          if (this.p.h === -1) {
+            this.p.x = n.x;
+            this.p.y = n.y;
+            return true;
+          }
+          if (d > 1) {
+            this.p.x -= (dx / d) * e;
+            this.p.y -= (dy / d) * e;
+          } else {
+            if (this.p.h > 0) {
+              this.p.h--;
+            } else {
+              return true;
+            }
+          }
+          return false;
+        },
+        _update: function () {
+          if (this._moveTowards(this.t)) {
+            var p = this.q.shift();
+            if (p) {
+              this.t.x = p.x || this.p.x;
+              this.t.y = p.y || this.p.y;
+              this.t.z = p.z || this.p.z;
+              this.t.a = p.a || this.p.a;
+              this.p.h = p.h || 0;
+            } else {
+              if (this.s) {
+                this.p.x -= Math.sin(Math.random() * 3.142);
+                this.p.y -= Math.sin(Math.random() * 3.142);
+              } else {
+                this.move(
+                  new S.Point({
+                    x: this.p.x + Math.random() * 50 - 25,
+                    y: this.p.y + Math.random() * 50 - 25,
+                  }),
+                );
+              }
+            }
+          }
+          d = this.p.a - this.t.a;
+          this.p.a = Math.max(0.1, this.p.a - d * 0.05);
+          d = this.p.z - this.t.z;
+          this.p.z = Math.max(1, this.p.z - d * 0.05);
+        },
+        distanceTo: function (n, details) {
+          var dx = this.p.x - n.x,
+            dy = this.p.y - n.y,
+            d = Math.sqrt(dx * dx + dy * dy);
+          return details ? [dx, dy, d] : d;
+        },
+        move: function (p, avoidStatic) {
+          if (!avoidStatic || (avoidStatic && this.distanceTo(p) > 1)) {
+            this.q.push(p);
+          }
+        },
+        render: function () {
+          this._update();
+          this._draw();
+        },
+      };
+      S.ShapeBuilder = (function () {
+        var gap = 13,
+          shapeCanvas = document.createElement('canvas'),
+          shapeContext = shapeCanvas.getContext('2d'),
+          fontSize = 500,
+          fontFamily = 'Avenir, Helvetica Neue, Helvetica, Arial, sans-serif';
+        function fit() {
+          shapeCanvas.width = Math.floor(window.innerWidth / gap) * gap;
+          shapeCanvas.height = Math.floor(window.innerHeight / gap) * gap;
+          shapeContext.fillStyle = 'red';
+          shapeContext.textBaseline = 'middle';
+          shapeContext.textAlign = 'center';
+        }
+        function processCanvas() {
+          var pixels = shapeContext.getImageData(0, 0, shapeCanvas.width, shapeCanvas.height).data;
+          (dots = []), pixels, (x = 0), (y = 0), (fx = shapeCanvas.width), (fy = shapeCanvas.height), (w = 0), (h = 0);
+          for (var p = 0; p < pixels.length; p += 4 * gap) {
+            if (pixels[p + 3] > 0) {
+              dots.push(
+                new S.Point({
+                  x: x,
+                  y: y,
+                }),
+              );
+              w = x > w ? x : w;
+              h = y > h ? y : h;
+              fx = x < fx ? x : fx;
+              fy = y < fy ? y : fy;
+            }
+            x += gap;
+            if (x >= shapeCanvas.width) {
+              x = 0;
+              y += gap;
+              p += gap * 4 * shapeCanvas.width;
+            }
+          }
+          return { dots: dots, w: w + fx, h: h + fy };
+        }
+        function setFontSize(s) {
+          shapeContext.font = 'bold ' + s + 'px ' + fontFamily;
+        }
+        function isNumber(n) {
+          return !isNaN(parseFloat(n)) && isFinite(n);
+        }
+        function init() {
+          fit();
+          window.addEventListener('resize', fit);
+        }
+        init();
+        return {
+          letter: function (l) {
+            var s = 0;
+            setFontSize(fontSize);
+            s = Math.min(
+              fontSize,
+              (shapeCanvas.width / shapeContext.measureText(l).width) * 0.8 * fontSize,
+              (shapeCanvas.height / fontSize) * (isNumber(l) ? 1 : 0.45) * fontSize,
+            );
+            setFontSize(s);
+            shapeContext.clearRect(0, 0, shapeCanvas.width, shapeCanvas.height);
+            shapeContext.fillText(l, shapeCanvas.width / 2, shapeCanvas.height / 2);
+            return processCanvas();
+          },
+        };
+      })();
+      S.Shape = (function () {
+        var dots = [],
+          width = 0,
+          height = 0,
+          cx = 0,
+          cy = 0;
+        function compensate() {
+          var a = S.Drawing.getArea();
+          cx = a.w / 2 - width / 2;
+          cy = a.h / 2 - height / 2;
+        }
+        return {
+          shuffleIdle: function () {
+            var a = S.Drawing.getArea();
+            for (var d = 0; d < dots.length; d++) {
+              if (!dots[d].s) {
+                dots[d].move({
+                  x: Math.random() * a.w,
+                  y: Math.random() * a.h,
+                });
+              }
+            }
+          },
+          switchShape: function (n, fast) {
+            var size,
+              a = S.Drawing.getArea();
+            width = n.w;
+            height = n.h;
+            compensate();
+            if (n.dots.length > dots.length) {
+              size = n.dots.length - dots.length;
+              for (var d = 1; d <= size; d++) {
+                dots.push(new S.Dot(a.w / 2, a.h / 2));
+              }
+            }
+            var d = 0,
+              i = 0;
+            while (n.dots.length > 0) {
+              i = Math.floor(Math.random() * n.dots.length);
+              dots[d].e = fast ? 0.25 : dots[d].s ? 0.14 : 0.11;
+              if (dots[d].s) {
+                dots[d].move(
+                  new S.Point({
+                    z: Math.random() * 20 + 10,
+                    a: Math.random(),
+                    h: 18,
+                  }),
+                );
+              } else {
+                dots[d].move(
+                  new S.Point({
+                    z: Math.random() * 5 + 5,
+                    h: fast ? 18 : 30,
+                  }),
+                );
+              }
+              dots[d].s = true;
+              dots[d].move(
+                new S.Point({
+                  x: n.dots[i].x + cx,
+                  y: n.dots[i].y + cy,
+                  a: 1,
+                  z: 5,
+                  h: 0,
+                }),
+              );
+              n.dots = n.dots.slice(0, i).concat(n.dots.slice(i + 1));
+              d++;
+            }
+            for (var i = d; i < dots.length; i++) {
+              if (dots[i].s) {
+                dots[i].move(
+                  new S.Point({
+                    z: Math.random() * 20 + 10,
+                    a: Math.random(),
+                    h: 20,
+                  }),
+                );
+                dots[i].s = false;
+                dots[i].e = 0.04;
+                dots[i].move(
+                  new S.Point({
+                    x: Math.random() * a.w,
+                    y: Math.random() * a.h,
+                    a: 0.3,
+                    z: Math.random() * 4,
+                    h: 0,
+                  }),
+                );
+              }
+            }
+          },
+          render: function () {
+            for (var d = 0; d < dots.length; d++) {
+              dots[d].render();
+            }
+          },
+        };
+      })();
+      S.init();
+    </script>
+  </body>
+</html>
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+  <title>爱心表白代码</title>
+  <style>
+body {
+  background: #000;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#ui .love {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -225px 0 0 -225px;
+  transform: translate(-50%, -50%);
+
+}
+#ui .love:last-child .love_word {
+  color: #fff;
+  font-size: 2rem;
+  text-shadow: 0 0 10px #66f9cf;
+}
+#ui .love_word {
+  color: #66f9cf;
+  font-size: 1.4rem;
+  transform: translateY(-100%) rotateZ(-30deg);
+  font-family: 'Dosis', sans-serif;
+  text-shadow: 0 0 10px #fff;
+  letter-spacing: 2px;
+}
+#ui .love_horizontal {
+  animation: horizontal 10000ms infinite alternate ease-in-out;
+}
+#ui .love_vertical {
+  animation: vertical 20000ms infinite linear;
+}
+#ui .love:nth-child(1) .love_horizontal {
+  animation-delay: -300ms;
+}
+#ui .love:nth-child(1) .love_vertical {
+  animation-delay: -300ms;
+}
+#ui .love:nth-child(2) .love_horizontal {
+  animation-delay: -600ms;
+}
+#ui .love:nth-child(2) .love_vertical {
+  animation-delay: -600ms;
+}
+#ui .love:nth-child(3) .love_horizontal {
+  animation-delay: -900ms;
+}
+#ui .love:nth-child(3) .love_vertical {
+  animation-delay: -900ms;
+}
+#ui .love:nth-child(4) .love_horizontal {
+  animation-delay: -1200ms;
+}
+#ui .love:nth-child(4) .love_vertical {
+  animation-delay: -1200ms;
+}
+#ui .love:nth-child(5) .love_horizontal {
+  animation-delay: -1500ms;
+}
+#ui .love:nth-child(5) .love_vertical {
+  animation-delay: -1500ms;
+}
+#ui .love:nth-child(6) .love_horizontal {
+  animation-delay: -1800ms;
+}
+#ui .love:nth-child(6) .love_vertical {
+  animation-delay: -1800ms;
+}
+#ui .love:nth-child(7) .love_horizontal {
+  animation-delay: -2100ms;
+}
+#ui .love:nth-child(7) .love_vertical {
+  animation-delay: -2100ms;
+}
+#ui .love:nth-child(8) .love_horizontal {
+  animation-delay: -2400ms;
+}
+#ui .love:nth-child(8) .love_vertical {
+  animation-delay: -2400ms;
+}
+#ui .love:nth-child(9) .love_horizontal {
+  animation-delay: -2700ms;
+}
+#ui .love:nth-child(9) .love_vertical {
+  animation-delay: -2700ms;
+}
+#ui .love:nth-child(10) .love_horizontal {
+  animation-delay: -3000ms;
+}
+#ui .love:nth-child(10) .love_vertical {
+  animation-delay: -3000ms;
+}
+#ui .love:nth-child(11) .love_horizontal {
+  animation-delay: -3300ms;
+}
+#ui .love:nth-child(11) .love_vertical {
+  animation-delay: -3300ms;
+}
+#ui .love:nth-child(12) .love_horizontal {
+  animation-delay: -3600ms;
+}
+#ui .love:nth-child(12) .love_vertical {
+  animation-delay: -3600ms;
+}
+#ui .love:nth-child(13) .love_horizontal {
+  animation-delay: -3900ms;
+}
+#ui .love:nth-child(13) .love_vertical {
+  animation-delay: -3900ms;
+}
+#ui .love:nth-child(14) .love_horizontal {
+  animation-delay: -4200ms;
+}
+#ui .love:nth-child(14) .love_vertical {
+  animation-delay: -4200ms;
+}
+#ui .love:nth-child(15) .love_horizontal {
+  animation-delay: -4500ms;
+}
+#ui .love:nth-child(15) .love_vertical {
+  animation-delay: -4500ms;
+}
+#ui .love:nth-child(16) .love_horizontal {
+  animation-delay: -4800ms;
+}
+#ui .love:nth-child(16) .love_vertical {
+  animation-delay: -4800ms;
+}
+#ui .love:nth-child(17) .love_horizontal {
+  animation-delay: -5100ms;
+}
+#ui .love:nth-child(17) .love_vertical {
+  animation-delay: -5100ms;
+}
+#ui .love:nth-child(18) .love_horizontal {
+  animation-delay: -5400ms;
+}
+#ui .love:nth-child(18) .love_vertical {
+  animation-delay: -5400ms;
+}
+#ui .love:nth-child(19) .love_horizontal {
+  animation-delay: -5700ms;
+}
+#ui .love:nth-child(19) .love_vertical {
+  animation-delay: -5700ms;
+}
+#ui .love:nth-child(20) .love_horizontal {
+  animation-delay: -6000ms;
+}
+#ui .love:nth-child(20) .love_vertical {
+  animation-delay: -6000ms;
+}
+#ui .love:nth-child(21) .love_horizontal {
+  animation-delay: -6300ms;
+}
+#ui .love:nth-child(21) .love_vertical {
+  animation-delay: -6300ms;
+}
+#ui .love:nth-child(22) .love_horizontal {
+  animation-delay: -6600ms;
+}
+#ui .love:nth-child(22) .love_vertical {
+  animation-delay: -6600ms;
+}
+#ui .love:nth-child(23) .love_horizontal {
+  animation-delay: -6900ms;
+}
+#ui .love:nth-child(23) .love_vertical {
+  animation-delay: -6900ms;
+}
+#ui .love:nth-child(24) .love_horizontal {
+  animation-delay: -7200ms;
+}
+#ui .love:nth-child(24) .love_vertical {
+  animation-delay: -7200ms;
+}
+#ui .love:nth-child(25) .love_horizontal {
+  animation-delay: -7500ms;
+}
+#ui .love:nth-child(25) .love_vertical {
+  animation-delay: -7500ms;
+}
+#ui .love:nth-child(26) .love_horizontal {
+  animation-delay: -7800ms;
+}
+#ui .love:nth-child(26) .love_vertical {
+  animation-delay: -7800ms;
+}
+#ui .love:nth-child(27) .love_horizontal {
+  animation-delay: -8100ms;
+}
+#ui .love:nth-child(27) .love_vertical {
+  animation-delay: -8100ms;
+}
+#ui .love:nth-child(28) .love_horizontal {
+  animation-delay: -8400ms;
+}
+#ui .love:nth-child(28) .love_vertical {
+  animation-delay: -8400ms;
+}
+#ui .love:nth-child(29) .love_horizontal {
+  animation-delay: -8700ms;
+}
+#ui .love:nth-child(29) .love_vertical {
+  animation-delay: -8700ms;
+}
+#ui .love:nth-child(30) .love_horizontal {
+  animation-delay: -9000ms;
+}
+#ui .love:nth-child(30) .love_vertical {
+  animation-delay: -9000ms;
+}
+#ui .love:nth-child(31) .love_horizontal {
+  animation-delay: -9300ms;
+}
+#ui .love:nth-child(31) .love_vertical {
+  animation-delay: -9300ms;
+}
+#ui .love:nth-child(32) .love_horizontal {
+  animation-delay: -9600ms;
+}
+#ui .love:nth-child(32) .love_vertical {
+  animation-delay: -9600ms;
+}
+#ui .love:nth-child(33) .love_horizontal {
+  animation-delay: -9900ms;
+}
+#ui .love:nth-child(33) .love_vertical {
+  animation-delay: -9900ms;
+}
+#ui .love:nth-child(34) .love_horizontal {
+  animation-delay: -10200ms;
+}
+#ui .love:nth-child(34) .love_vertical {
+  animation-delay: -10200ms;
+}
+#ui .love:nth-child(35) .love_horizontal {
+  animation-delay: -10500ms;
+}
+#ui .love:nth-child(35) .love_vertical {
+  animation-delay: -10500ms;
+}
+#ui .love:nth-child(36) .love_horizontal {
+  animation-delay: -10800ms;
+}
+#ui .love:nth-child(36) .love_vertical {
+  animation-delay: -10800ms;
+}
+#ui .love:nth-child(37) .love_horizontal {
+  animation-delay: -11100ms;
+}
+#ui .love:nth-child(37) .love_vertical {
+  animation-delay: -11100ms;
+}
+#ui .love:nth-child(38) .love_horizontal {
+  animation-delay: -11400ms;
+}
+#ui .love:nth-child(38) .love_vertical {
+  animation-delay: -11400ms;
+}
+#ui .love:nth-child(39) .love_horizontal {
+  animation-delay: -11700ms;
+}
+#ui .love:nth-child(39) .love_vertical {
+  animation-delay: -11700ms;
+}
+#ui .love:nth-child(40) .love_horizontal {
+  animation-delay: -12000ms;
+}
+#ui .love:nth-child(40) .love_vertical {
+  animation-delay: -12000ms;
+}
+#ui .love:nth-child(41) .love_horizontal {
+  animation-delay: -12300ms;
+}
+#ui .love:nth-child(41) .love_vertical {
+  animation-delay: -12300ms;
+}
+#ui .love:nth-child(42) .love_horizontal {
+  animation-delay: -12600ms;
+}
+#ui .love:nth-child(42) .love_vertical {
+  animation-delay: -12600ms;
+}
+#ui .love:nth-child(43) .love_horizontal {
+  animation-delay: -12900ms;
+}
+#ui .love:nth-child(43) .love_vertical {
+  animation-delay: -12900ms;
+}
+#ui .love:nth-child(44) .love_horizontal {
+  animation-delay: -13200ms;
+}
+#ui .love:nth-child(44) .love_vertical {
+  animation-delay: -13200ms;
+}
+#ui .love:nth-child(45) .love_horizontal {
+  animation-delay: -13500ms;
+}
+#ui .love:nth-child(45) .love_vertical {
+  animation-delay: -13500ms;
+}
+#ui .love:nth-child(46) .love_horizontal {
+  animation-delay: -13800ms;
+}
+#ui .love:nth-child(46) .love_vertical {
+  animation-delay: -13800ms;
+}
+#ui .love:nth-child(47) .love_horizontal {
+  animation-delay: -14100ms;
+}
+#ui .love:nth-child(47) .love_vertical {
+  animation-delay: -14100ms;
+}
+#ui .love:nth-child(48) .love_horizontal {
+  animation-delay: -14400ms;
+}
+#ui .love:nth-child(48) .love_vertical {
+  animation-delay: -14400ms;
+}
+#ui .love:nth-child(49) .love_horizontal {
+  animation-delay: -14700ms;
+}
+#ui .love:nth-child(49) .love_vertical {
+  animation-delay: -14700ms;
+}
+#ui .love:nth-child(50) .love_horizontal {
+  animation-delay: -15000ms;
+}
+#ui .love:nth-child(50) .love_vertical {
+  animation-delay: -15000ms;
+}
+#ui .love:nth-child(51) .love_horizontal {
+  animation-delay: -15300ms;
+}
+#ui .love:nth-child(51) .love_vertical {
+  animation-delay: -15300ms;
+}
+#ui .love:nth-child(52) .love_horizontal {
+  animation-delay: -15600ms;
+}
+#ui .love:nth-child(52) .love_vertical {
+  animation-delay: -15600ms;
+}
+#ui .love:nth-child(53) .love_horizontal {
+  animation-delay: -15900ms;
+}
+#ui .love:nth-child(53) .love_vertical {
+  animation-delay: -15900ms;
+}
+#ui .love:nth-child(54) .love_horizontal {
+  animation-delay: -16200ms;
+}
+#ui .love:nth-child(54) .love_vertical {
+  animation-delay: -16200ms;
+}
+#ui .love:nth-child(55) .love_horizontal {
+  animation-delay: -16500ms;
+}
+#ui .love:nth-child(55) .love_vertical {
+  animation-delay: -16500ms;
+}
+#ui .love:nth-child(56) .love_horizontal {
+  animation-delay: -16800ms;
+}
+#ui .love:nth-child(56) .love_vertical {
+  animation-delay: -16800ms;
+}
+#ui .love:nth-child(57) .love_horizontal {
+  animation-delay: -17100ms;
+}
+#ui .love:nth-child(57) .love_vertical {
+  animation-delay: -17100ms;
+}
+#ui .love:nth-child(58) .love_horizontal {
+  animation-delay: -17400ms;
+}
+#ui .love:nth-child(58) .love_vertical {
+  animation-delay: -17400ms;
+}
+#ui .love:nth-child(59) .love_horizontal {
+  animation-delay: -17700ms;
+}
+#ui .love:nth-child(59) .love_vertical {
+  animation-delay: -17700ms;
+}
+#ui .love:nth-child(60) .love_horizontal {
+  animation-delay: -18000ms;
+}
+#ui .love:nth-child(60) .love_vertical {
+  animation-delay: -18000ms;
+}
+#ui .love:nth-child(61) .love_horizontal {
+  animation-delay: -18300ms;
+}
+#ui .love:nth-child(61) .love_vertical {
+  animation-delay: -18300ms;
+}
+#ui .love:nth-child(62) .love_horizontal {
+  animation-delay: -18600ms;
+}
+#ui .love:nth-child(62) .love_vertical {
+  animation-delay: -18600ms;
+}
+#ui .love:nth-child(63) .love_horizontal {
+  animation-delay: -18900ms;
+}
+#ui .love:nth-child(63) .love_vertical {
+  animation-delay: -18900ms;
+}
+#ui .love:nth-child(64) .love_horizontal {
+  animation-delay: -19200ms;
+}
+#ui .love:nth-child(64) .love_vertical {
+  animation-delay: -19200ms;
+}
+#ui .love:nth-child(65) .love_horizontal {
+  animation-delay: -19500ms;
+}
+#ui .love:nth-child(65) .love_vertical {
+  animation-delay: -19500ms;
+}
+#ui .love:nth-child(66) .love_horizontal {
+  animation-delay: -19800ms;
+}
+#ui .love:nth-child(66) .love_vertical {
+  animation-delay: -19800ms;
+}
+#ui .love:nth-child(67) .love_horizontal {
+  animation-delay: -20100ms;
+}
+#ui .love:nth-child(67) .love_vertical {
+  animation-delay: -20100ms;
+}
+#ui .love:nth-child(68) .love_horizontal {
+  animation-delay: -20400ms;
+}
+#ui .love:nth-child(68) .love_vertical {
+  animation-delay: -20400ms;
+}
+#ui .love:nth-child(69) .love_horizontal {
+  animation-delay: -20700ms;
+}
+#ui .love:nth-child(69) .love_vertical {
+  animation-delay: -20700ms;
+}
+#ui .love:nth-child(70) .love_horizontal {
+  animation-delay: -21000ms;
+}
+#ui .love:nth-child(70) .love_vertical {
+  animation-delay: -21000ms;
+}
+#ui .love:nth-child(71) .love_horizontal {
+  animation-delay: -21300ms;
+}
+#ui .love:nth-child(71) .love_vertical {
+  animation-delay: -21300ms;
+}
+#ui .love:nth-child(72) .love_horizontal {
+  animation-delay: -21600ms;
+}
+#ui .love:nth-child(72) .love_vertical {
+  animation-delay: -21600ms;
+}
+#ui .love:nth-child(73) .love_horizontal {
+  animation-delay: -21900ms;
+}
+#ui .love:nth-child(73) .love_vertical {
+  animation-delay: -21900ms;
+}
+#ui .love:nth-child(74) .love_horizontal {
+  animation-delay: -22200ms;
+}
+#ui .love:nth-child(74) .love_vertical {
+  animation-delay: -22200ms;
+}
+#ui .love:nth-child(75) .love_horizontal {
+  animation-delay: -22500ms;
+}
+#ui .love:nth-child(75) .love_vertical {
+  animation-delay: -22500ms;
+}
+#ui .love:nth-child(76) .love_horizontal {
+  animation-delay: -22800ms;
+}
+#ui .love:nth-child(76) .love_vertical {
+  animation-delay: -22800ms;
+}
+#ui .love:nth-child(77) .love_horizontal {
+  animation-delay: -23100ms;
+}
+#ui .love:nth-child(77) .love_vertical {
+  animation-delay: -23100ms;
+}
+#ui .love:nth-child(78) .love_horizontal {
+  animation-delay: -23400ms;
+}
+#ui .love:nth-child(78) .love_vertical {
+  animation-delay: -23400ms;
+}
+#ui .love:nth-child(79) .love_horizontal {
+  animation-delay: -23700ms;
+}
+#ui .love:nth-child(79) .love_vertical {
+  animation-delay: -23700ms;
+}
+#ui .love:nth-child(80) .love_horizontal {
+  animation-delay: -24000ms;
+}
+#ui .love:nth-child(80) .love_vertical {
+  animation-delay: -24000ms;
+}
+#ui .love:nth-child(81) .love_horizontal {
+  animation-delay: -24300ms;
+}
+#ui .love:nth-child(81) .love_vertical {
+  animation-delay: -24300ms;
+}
+#ui .love:nth-child(82) .love_horizontal {
+  animation-delay: -24600ms;
+}
+#ui .love:nth-child(82) .love_vertical {
+  animation-delay: -24600ms;
+}
+#ui .love:nth-child(83) .love_horizontal {
+  animation-delay: -24900ms;
+}
+#ui .love:nth-child(83) .love_vertical {
+  animation-delay: -24900ms;
+}
+#ui .love:nth-child(84) .love_horizontal {
+  animation-delay: -25200ms;
+}
+#ui .love:nth-child(84) .love_vertical {
+  animation-delay: -25200ms;
+}
+#ui .love:nth-child(85) .love_horizontal {
+  animation-delay: -25500ms;
+}
+#ui .love:nth-child(85) .love_vertical {
+  animation-delay: -25500ms;
+}
+#ui .love:nth-child(86) .love_horizontal {
+  animation-delay: -25800ms;
+}
+#ui .love:nth-child(86) .love_vertical {
+  animation-delay: -25800ms;
+}
+#ui .love:nth-child(87) .love_horizontal {
+  animation-delay: -26100ms;
+}
+#ui .love:nth-child(87) .love_vertical {
+  animation-delay: -26100ms;
+}
+#ui .love:nth-child(88) .love_horizontal {
+  animation-delay: -26400ms;
+}
+#ui .love:nth-child(88) .love_vertical {
+  animation-delay: -26400ms;
+}
+#ui .love:nth-child(89) .love_horizontal {
+  animation-delay: -26700ms;
+}
+#ui .love:nth-child(89) .love_vertical {
+  animation-delay: -26700ms;
+}
+#ui .love:nth-child(90) .love_horizontal {
+  animation-delay: -27000ms;
+}
+#ui .love:nth-child(90) .love_vertical {
+  animation-delay: -27000ms;
+}
+#ui .love:nth-child(91) .love_horizontal {
+  animation-delay: -27300ms;
+}
+#ui .love:nth-child(91) .love_vertical {
+  animation-delay: -27300ms;
+}
+#ui .love:nth-child(92) .love_horizontal {
+  animation-delay: -27600ms;
+}
+#ui .love:nth-child(92) .love_vertical {
+  animation-delay: -27600ms;
+}
+#ui .love:nth-child(93) .love_horizontal {
+  animation-delay: -27900ms;
+}
+#ui .love:nth-child(93) .love_vertical {
+  animation-delay: -27900ms;
+}
+#ui .love:nth-child(94) .love_horizontal {
+  animation-delay: -28200ms;
+}
+#ui .love:nth-child(94) .love_vertical {
+  animation-delay: -28200ms;
+}
+#ui .love:nth-child(95) .love_horizontal {
+  animation-delay: -28500ms;
+}
+#ui .love:nth-child(95) .love_vertical {
+  animation-delay: -28500ms;
+}
+#ui .love:nth-child(96) .love_horizontal {
+  animation-delay: -28800ms;
+}
+#ui .love:nth-child(96) .love_vertical {
+  animation-delay: -28800ms;
+}
+#ui .love:nth-child(97) .love_horizontal {
+  animation-delay: -29100ms;
+}
+#ui .love:nth-child(97) .love_vertical {
+  animation-delay: -29100ms;
+}
+#ui .love:nth-child(98) .love_horizontal {
+  animation-delay: -29400ms;
+}
+#ui .love:nth-child(98) .love_vertical {
+  animation-delay: -29400ms;
+}
+#ui .love:nth-child(99) .love_horizontal {
+  animation-delay: -29700ms;
+}
+#ui .love:nth-child(99) .love_vertical {
+  animation-delay: -29700ms;
+}
+#ui .love:nth-child(100) .love_horizontal {
+  animation-delay: -30000ms;
+}
+#ui .love:nth-child(100) .love_vertical {
+  animation-delay: -30000ms;
+}
+
+@keyframes horizontal {
+  from {
+    transform: translateX(0px);
+  }
+  to {
+    transform: translateX(450px);
+  }
+}
+@keyframes vertical {
+  0% {
+    transform: translateY(180px);
+  }
+  10% {
+    transform: translateY(45px);
+  }
+  15% {
+    transform: translateY(4.5px);
+  }
+  18% {
+    transform: translateY(0px);
+  }
+  20% {
+    transform: translateY(4.5px);
+  }
+  22% {
+    transform: translateY(34.61538px);
+  }
+  24% {
+    transform: translateY(64.28571px);
+  }
+  25% {
+    transform: translateY(112.5px);
+  }
+  26% {
+    transform: translateY(64.28571px);
+  }
+  28% {
+    transform: translateY(34.61538px);
+  }
+  30% {
+    transform: translateY(4.5px);
+  }
+  32% {
+    transform: translateY(0px);
+  }
+  35% {
+    transform: translateY(4.5px);
+  }
+  40% {
+    transform: translateY(45px);
+  }
+  50% {
+    transform: translateY(180px);
+  }
+  71% {
+    transform: translateY(428.57143px);
+  }
+  72.5% {
+    transform: translateY(441.17647px);
+  }
+  75% {
+    transform: translateY(450px);
+  }
+  77.5% {
+    transform: translateY(441.17647px);
+  }
+  79% {
+    transform: translateY(428.57143px);
+  }
+  100% {
+    transform: translateY(180px);
+  }
+}
+
+  </style>
+<style class="mpa-style-fix ImageGatherer">.FotorFrame{position:fixed!important}</style><style class="mpa-style-fix SideFunctionPanel">.weui-desktop-online-faq__wrp{top:304px!important;bottom:unset!important}.weui-desktop-online-faq__wrp .weui-desktop-online-faq__switch{width:38px!important}</style><script src="./浪漫至死不渝_files/monitors.3.6.36.cn.js.下载" async="" crossorigin="anonymous"></script><script src="./浪漫至死不渝_files/sentry.3.6.36.cn.js.下载" async="" crossorigin="anonymous"></script></head>
+<body mpa-version="9.0.21" mpa-extension-id="ibefaeehajgcpooopoegkifhgecigeeg">
+  <div id="ui">
+    <!-- 条目 1-10 (全部≤20字符) -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Happy Birthday</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Joyeux Anniversaire</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Veels geluk</div></div></div></div> <!-- 荷兰语替换德语 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Χρόνια Πολλά</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Boldog születésnapot</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Ojúbọ̀</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Lá breithe sona</div></div></div></div> <!-- 爱尔兰盖尔语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Hyvää syntymäpäivää</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Gefeliciteerd!</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Buon Compleanno</div></div></div></div>
+
+    <!-- 条目 11-20 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Feliz Cumpleaños</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Heri ya kuzaliwa</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Usuku oluhle</div></div></div></div> <!-- 祖鲁语缩短 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Tillykke</div></div></div></div> <!-- 丹麦语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Feliz Aniversário</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Tavsuaq</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Su gimtadieniu</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Среќен роденден</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Ad günün mübarək</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Vanuinavinaka</div></div></div></div>
+
+    <!-- 条目 21-30 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Sto lat</div></div></div></div> <!-- 波兰语通用祝福 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">La Mulți Ani</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Rā whānau</div></div></div></div> <!-- 毛利语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Vse najboljše</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">สุขสันต์วันเกิด</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Sretan rođendan</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">မွေးနေ့မင်္ဂလာပါ</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Selamat Ulang Tahun</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">រីករាយថ្ងៃកំណើត</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Umunsi mwiza</div></div></div></div>
+
+    <!-- 条目 31-40 (新增小语种) -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Nkwagaliza</div></div></div></div> <!-- 卢干达语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">お誕生日おめでとう</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">생일 축하해요</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">عيد ميلاد سعيد</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Awguri</div></div></div></div> <!-- 马耳他语替换 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Selamat Hari Jadi</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">जन्मदिनको शुभकामना</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">تولدت مبارک</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Grattis</div></div></div></div> <!-- 瑞典语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">İyi ki doğdun</div></div></div></div>
+
+    <!-- 条目 41-50 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Piranda naal</div></div></div></div> <!-- 泰米尔语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Chúc mừng sinh nhật</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Feliç Aniversari</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">ສຸກສັນວັນເກີດ</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Lefatshe le monate</div></div></div></div> <!-- 塞索托语替换 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">La Mulți Ani</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Maligayang Bati</div></div></div></div> <!-- 菲律宾语替换 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Lusuku loluhle</div></div></div></div> <!-- 斯威士语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Tillukku</div></div></div></div> <!-- 泰米尔语二次缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Hauʻoli Lā Hānau</div></div></div></div>
+
+    <!-- 条目 51-60 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Barka da ranar haihuwa</div></div></div></div> <!-- 豪萨语（尼日利亚） -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Lokua boni</div></div></div></div> <!-- 林加拉语（刚果） -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Penblwydd Hapus</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Bone annivèrsaire</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Yom Huledet</div></div></div></div> <!-- 希伯来语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Dhalasho Wacan</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Manuia</div></div></div></div> <!-- 萨摩亚语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Inuuinni</div></div></div></div> <!-- 格陵兰语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Laa breiney mie</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Happy Birthday</div></div></div></div>
+
+    <!-- 条目 61-66 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Usuku oluhle</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Feliĉan Naskiĝtagon</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Lowena</div></div></div></div> <!-- 康沃尔语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Sugeng warsa</div></div></div></div> <!-- 爪哇语缩写 -->
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">Честит рожден ден</div></div></div></div>
+    <div class="love"><div class="love_horizontal"><div class="love_vertical"><div class="love_word">生日快乐</div></div></div></div>
+  </div>
+</body></html>
